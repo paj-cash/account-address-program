@@ -63,7 +63,6 @@ pub mod account_address_program {
     }
 
     pub fn transfer_token_to_pool(ctx: Context<TransferTokenToPool>, _account_number: String, _bank_code: String, _region: String) -> Result<()> {
-        // let token_interface = TokenInterface::new(ctx.accounts.account_token_address.to_account_info());
         let cpi_program = ctx.accounts.token_program.to_account_info();
         let from_pubkey = ctx.accounts.account_token_address.to_account_info();
         let to_pubkey = ctx.accounts.tx_pool_token_account.to_account_info();

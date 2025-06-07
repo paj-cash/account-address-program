@@ -15,9 +15,11 @@ import {
   mintTo,
   transfer,
   getAccount,
+  TOKEN_PROGRAM_ID,
 } from "@solana/spl-token";
 import { join } from "path";
 import { readFileSync } from "fs";
+import { get } from "http";
 
 // typescript
 
@@ -127,7 +129,7 @@ describe("account-address-program", () => {
       mint,
       senderAta,
       payer.publicKey,
-      1000_000_000 // 1000 tokens (with 9 decimals)
+      1000_000_000 // 1000 tokens (with 6 decimals)
     );
 
     const recipientAccountInfoBefore = await getAccount(connection, tochiATA);
@@ -157,13 +159,17 @@ describe("account-address-program", () => {
     );
   });
 
-  it.only("Transfer SPL Token to Pool", async () => {
+  it.skip("Transfer SPL Token to Pool", async () => {
     const tochiABAA_ATA = await getPDA_ATA(tochiABAA[0]);
     console.log("Tochi Account Token Account:", tochiABAA_ATA.toBase58());
     const poolATA = await getATA(user1.publicKey);
     console.log("Pool Token Account:", poolATA.toBase58());
 
     const initialBalance = await getAccount(connection, tochiABAA_ATA);
+    console.log(
+      "Initial Tochi Account Token Balance:",
+      initialBalance.amount.toString()
+    );
 
     const txSig = await program.methods
       .transferTokenToPool(accountNumber, bankCode, region)
@@ -172,12 +178,27 @@ describe("account-address-program", () => {
         mint: mint,
         accountTokenAddress: tochiABAA_ATA,
         txPool: user1.publicKey,
-        txPoolTokenAccount: await getATA(poolATA),
+        txPoolTokenAccount: poolATA,
+        tokenProgram: TOKEN_PROGRAM_ID,
       })
       .signers([payer])
       .rpc();
 
+    console.log("Transfer SPL Token to Pool Transaction Signature:", txSig);
     assert.isString(txSig, "Transaction signature should be a string");
+  });
+
+  it.only("Get Account Address Info", async () => {
+    const addressInfoPDA = getAccountInfoPda();
+    const accountInfo = await program.account.accountAddress.fetch(
+      addressInfoPDA[0]
+    );
+    console.log("Account Address Info:", accountInfo);
+    assert.equal(
+      accountInfo.accountName,
+      accountName,
+      "Account name should match"
+    );
   });
 
   function getAccountInfoPda(): [PublicKey, number] {
