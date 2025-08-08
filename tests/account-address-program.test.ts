@@ -53,13 +53,15 @@ describe("account-address-program", () => {
   });
 
   it.skip("Create Account Address", async () => {
-    const accountInfo = getAccountInfoPda();
+    const accountInfo = getAccountInfoPda(tochiABAA[0]);
     console.log({
       accountAddress: tochiABAA[0].toString(),
       accountInfo: accountInfo[0].toString(),
     });
 
-    const tx = await program.methods
+    console.log({ payer: payer.publicKey.toString() });
+
+    const signature = await program.methods
       .createAccountAddress(accountName, accountNumber, bankCode, region)
       .accounts({
         payer: payer.publicKey,
@@ -67,15 +69,27 @@ describe("account-address-program", () => {
       .signers([payer])
       .rpc();
 
+    const latestBlockhash = await connection.getLatestBlockhash();
+    await provider.connection.confirmTransaction({
+      blockhash: latestBlockhash.blockhash,
+      lastValidBlockHeight: latestBlockhash.lastValidBlockHeight,
+      signature: signature,
+    });
+
+    const accountInfoData = await program.account.accountAddressInfo.fetch(
+      accountInfo[0]
+    );
+    const accountInfoName = accountInfoData.accountName;
+    // console.log({ accountInfoName });
     // Fetch the created account (replace with your account fetch logic)
     // const tochiAccount = await getAccount(connection, tochiABAA[0]);
     // const account = await program.account.accountAddress.fetch(tochiABAA[0]);
     // console.log("Account Address Lamport:", tochiAccount.amount);
     // assert.equal(account.owner.toBase58(), payer.publicKey.toBase58());
-    assert.isString(tx, "Transaction signature should be a string");
+    assert.equal(accountInfoName, accountInfoName);
   });
 
-  it.skip("Transfer SOL to Account Address", async () => {
+  it.only("Transfer SOL to Account Address", async () => {
     const initialBalance = await connection.getBalance(tochiABAA[0]);
 
     const transaction = new Transaction().add(
@@ -96,12 +110,12 @@ describe("account-address-program", () => {
     );
   });
 
-  it.skip("Transfer SPL Token to Pool", async () => {
+  it.only("Transfer Sol Token to Pool", async () => {
     const initialBalance = await connection.getBalance(tochiABAA[0]);
 
     const tx = await program.methods
       .transferSolToPool(accountNumber, bankCode, region)
-      .accounts({ payer: payer.publicKey, txPool: user1.publicKey })
+      .accounts({ payer: payer.publicKey, txPool: payer.publicKey })
       .signers([payer])
       .rpc();
     console.log("Transfer SOL to Tx Pool Transaction Signature:", tx);
@@ -161,15 +175,17 @@ describe("account-address-program", () => {
 
   it.skip("Transfer SPL Token to Pool", async () => {
     const tochiABAA_ATA = await getPDA_ATA(tochiABAA[0]);
-    console.log("Tochi Account Token Account:", tochiABAA_ATA.toBase58());
-    const poolATA = await getATA(user1.publicKey);
-    console.log("Pool Token Account:", poolATA.toBase58());
+    // console.log("Tochi Account Token Account:", tochiABAA_ATA.toBase58());
+    const poolATA = await getATA(payer.publicKey); //(user1.publicKey);
+    // console.log("Pool Token Account:", poolATA.toBase58());
 
     const initialBalance = await getAccount(connection, tochiABAA_ATA);
-    console.log(
-      "Initial Tochi Account Token Balance:",
-      initialBalance.amount.toString()
-    );
+    // console.log(
+    //   "Initial Tochi Account Token Balance:",
+    //   initialBalance.amount.toString()
+    // );
+
+    console.log("Payer Public Key:", payer.publicKey.toBase58());
 
     const txSig = await program.methods
       .transferTokenToPool(accountNumber, bankCode, region)
@@ -177,7 +193,7 @@ describe("account-address-program", () => {
         payer: payer.publicKey,
         mint: mint,
         accountTokenAddress: tochiABAA_ATA,
-        txPool: user1.publicKey,
+        txPool: payer.publicKey,
         txPoolTokenAccount: poolATA,
         tokenProgram: TOKEN_PROGRAM_ID,
       })
@@ -188,9 +204,10 @@ describe("account-address-program", () => {
     assert.isString(txSig, "Transaction signature should be a string");
   });
 
-  it.only("Get Account Address Info", async () => {
-    const addressInfoPDA = getAccountInfoPda();
-    const accountInfo = await program.account.accountAddress.fetch(
+  it.skip("Get Account Address Info", async () => {
+    const aba = new PublicKey("2hv43FjszwhwqsUAQxvh9RKW9AjG3WM5wM1TkACDoYJY");
+    const addressInfoPDA = getAccountInfoPda(aba); //tochiABAA[0]);
+    const accountInfo = await program.account.accountAddressInfo.fetch(
       addressInfoPDA[0]
     );
     console.log("Account Address Info:", accountInfo);
@@ -201,14 +218,9 @@ describe("account-address-program", () => {
     );
   });
 
-  function getAccountInfoPda(): [PublicKey, number] {
+  function getAccountInfoPda(pubkey: PublicKey): [PublicKey, number] {
     return PublicKey.findProgramAddressSync(
-      [
-        Buffer.from("info"),
-        Buffer.from(accountNumber),
-        Buffer.from(bankCode),
-        Buffer.from(region),
-      ],
+      [Buffer.from("info"), pubkey.toBytes()],
       program.programId
     );
   }
@@ -290,3 +302,5 @@ async function registerKeypair(
     console.log(`Airdropped 1 SOL to ${keypair.publicKey.toBase58()}`);
   }
 }
+
+//5gochADjUuuDFQidGsSk39iNQMwHJ95JeAYTe8JzJchf9SN94fdQy4tythMdLNwciaPDxxaNXJA4Wf7qVPMo59Be

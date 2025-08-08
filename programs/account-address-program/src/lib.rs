@@ -3,9 +3,9 @@ use anchor_lang::prelude::*;
 use anchor_lang::system_program;
 use anchor_spl::token_interface::{self, Mint, TokenAccount, TokenInterface, TransferChecked};
 
-declare_id!("HXznYGd1fHXpYX5kuAd4V7EHWCJszzA7NiWcaSJHgRDE");
+declare_id!("PAJaDhENqtjWP8chUXGAoU6K9dsuKC65GdqwKTy5fgM");
 
-pub const AUTHORITY: Pubkey = pubkey!("BPFra4hXKUbS9voZK5R3pvfk8WtDBVcdSUaLPEjxHfWD");
+pub const AUTHORITY: Pubkey = pubkey!("PAJiUaKgxTBJVADc1wdiUygLd51biQPVB8KkJqYu53L");
 pub const ANCHOR_DISCRIMINATOR_SIZE: usize = 8;
 
 #[program]
@@ -13,7 +13,7 @@ pub mod account_address_program {
     use super::*;
 
     pub fn create_account_address(ctx: Context<CreateAccountAddress>, account_name: String, _account_number: String, _bank_code: String, _region: String) -> Result<()> {
-        let account_info = &mut ctx.accounts.account_info;
+        let account_info = &mut ctx.accounts.account_address_info;
         account_info.account_name = account_name;
 
         let rent = Rent::get()?;
@@ -99,19 +99,17 @@ pub struct CreateAccountAddress<'info> {
         mut,
         seeds = [_account_number.as_bytes(), _bank_code.as_bytes(), _region.as_bytes()],
         bump,
-        // space = ANCHOR_DISCRIMINATOR_SIZE,
-        // payer = payer,
     )]
     pub account_address: SystemAccount<'info>,
 
     #[account(
         init,
         payer = payer,
-        space = ANCHOR_DISCRIMINATOR_SIZE  + std::mem::size_of::<AccountAddress>(),
-        seeds = [b"info", _account_number.as_bytes(), _bank_code.as_bytes(), _region.as_bytes()],
+        space = ANCHOR_DISCRIMINATOR_SIZE  + AccountAddressInfo::INIT_SPACE,
+        seeds = [b"info", account_address.key().as_ref()],
         bump,
     )]
-    pub account_info: Account<'info, AccountAddress>,
+    pub account_address_info: Account<'info, AccountAddressInfo>,
     pub system_program: Program<'info, System>,
 }
 
@@ -128,7 +126,10 @@ pub struct TransferSolToPool<'info> {
     )]
     pub account_address: SystemAccount<'info>,
 
-    #[account(mut)]
+    #[account(
+        mut,
+        constraint = tx_pool.key() == AUTHORITY @ ErrorCode::InvalidPool
+    )]
     pub tx_pool: SystemAccount<'info>,
     pub system_program: Program<'info, System>,
 }
@@ -154,7 +155,10 @@ pub struct TransferTokenToPool<'info> {
     )]
     pub account_token_address: InterfaceAccount<'info, TokenAccount>,
 
-    #[account(mut)]
+    #[account(
+        mut,
+        constraint = tx_pool.key() == AUTHORITY @ ErrorCode::InvalidPool
+    )]
     pub tx_pool: SystemAccount<'info>,
     #[account(
         mut,
@@ -169,7 +173,9 @@ pub struct TransferTokenToPool<'info> {
 }
 
 #[account]
-pub struct AccountAddress {
+#[derive(InitSpace)]
+pub struct AccountAddressInfo {
+    #[max_len(60)]
     pub account_name: String,
 }
 
@@ -177,6 +183,8 @@ pub struct AccountAddress {
 pub enum ErrorCode {
     #[msg("Only the authority can create an account address")]
     InvalidAuthority,
+    #[msg("Attempt to withdraw to unverified pool")]
+    InvalidPool,
     #[msg("Can't detaermint transfer amount due to rent exception")]
     InvalidTransferAmount,
 }
